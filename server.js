@@ -7,6 +7,9 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const app = express();
+
+app.set('trust proxy', 1);
+
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
 

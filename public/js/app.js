@@ -5,7 +5,28 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show'
 function closeMenu(){sidebar.classList.remove('open');overlay.classList.remove('show')}
 function setActive(section){$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.section===section)); $('#pageTitle').textContent=section==='inicio'?'Inicio':section==='perfil'?'Mi perfil':section==='admin'?'Administrar alumnos':section==='admin-calendario'?'Editar calendario':section[0].toUpperCase()+section.slice(1)}
 function show(section){dashboardView.style.display=section==='inicio'?'block':'none';profileView.style.display=section==='perfil'?'block':'none';adminView.style.display=section==='admin'?'block':'none';calendarAdminView.style.display=section==='admin-calendario'?'block':'none';setActive(section);closeMenu();if(section==='perfil')loadProfile();if(section==='admin')loadAdmin();if(section==='admin-calendario')loadCalendarAdmin();if(section==='inicio')loadCalendar();if(!['inicio','perfil','admin','admin-calendario'].includes(section))toast(`Sección ${section}: lista para ampliar.`)}
-async function api(url,opts={}){const r=await fetch(url,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||'Ocurrió un error.');return data}
+async function api(url,opts={}){
+  const r = await fetch(url,{
+    credentials:'include',
+    headers:{
+      'Content-Type':'application/json',
+      ...(opts.headers||{})
+    },
+    ...opts
+  });
+
+  let data={};
+
+  try{
+    data=await r.json();
+  }catch{}
+
+  if(!r.ok){
+    throw new Error(data.error||'Ocurrió un error.');
+  }
+
+  return data;
+}
 async function loadMe(){const d=await api('/api/me');currentUser=d.user;currentProfile=d.profile;updateHeader();if(currentUser.role==='admin'){$('#adminNav').classList.remove('hidden');$('#calendarAdminNav').classList.remove('hidden');$('#welcomeTitle').textContent='¡Hola, administrador! 🛠️';$('#welcomeText').textContent='Desde aquí podés administrar alumnos y el calendario académico.'}else{$('#adminNav').classList.add('hidden');const full=currentProfile?`${currentProfile.nombre} ${currentProfile.apellido}`:'Estudiante';$('#welcomeTitle').textContent=`¡Hola, ${currentProfile?.nombre||'estudiante'}! 👋`;$('#welcomeText').textContent='Bienvenido/a a tu campus virtual. Desde aquí podés consultar tu información académica.';$('#profileName').textContent=full;$('#profileCareer').textContent=currentProfile?.carrera||''}$('#miniName').textContent=currentUser.role==='admin'?'Administrador':`${currentProfile?.nombre||'Estudiante'} ${currentProfile?.apellido||''}`;$('#miniRole').textContent=currentUser.role==='admin'?'Administrador':'Alumno'}
 function updateHeader(){const text=currentUser.role==='admin'?'AD':((currentProfile?.nombre?.[0]||'E')+(currentProfile?.apellido?.[0]||'D')).toUpperCase();$('#miniAvatar').textContent=text;$('#profileAvatar').textContent=text}
 async function loadCourses(){if(currentUser.role==='admin'){ $('#statMaterias').textContent='3'; return }const rows=await api('/api/materias');$('#statMaterias').textContent=rows.length;const list=$('#courseList');list.innerHTML=rows.map(m=>`<article class="course" data-search="${m.nombre.toLowerCase()}"><div class="course-icon">${m.codigo.substring(0,3)}</div><div><h4>${m.nombre}</h4><small>Código ${m.codigo}</small><div class="progress-wrap"><div class="progress-info"><span>Progreso</span><span>${m.progreso}%</span></div><div class="progress"><div class="progress-bar" style="width:${m.progreso}%"></div></div></div></div><span class="tag ${m.estado==='En curso'?'green':m.estado==='Pendiente'?'yellow':'blue'}">${m.estado}</span></article>`).join('')}
