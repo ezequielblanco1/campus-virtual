@@ -10,7 +10,80 @@ async function loadMe(){const d=await api('/api/me');currentUser=d.user;currentP
 function updateHeader(){const text=currentUser.role==='admin'?'AD':((currentProfile?.nombre?.[0]||'E')+(currentProfile?.apellido?.[0]||'D')).toUpperCase();$('#miniAvatar').textContent=text;$('#profileAvatar').textContent=text}
 async function loadCourses(){if(currentUser.role==='admin'){ $('#statMaterias').textContent='3'; return }const rows=await api('/api/materias');$('#statMaterias').textContent=rows.length;const list=$('#courseList');list.innerHTML=rows.map(m=>`<article class="course" data-search="${m.nombre.toLowerCase()}"><div class="course-icon">${m.codigo.substring(0,3)}</div><div><h4>${m.nombre}</h4><small>Código ${m.codigo}</small><div class="progress-wrap"><div class="progress-info"><span>Progreso</span><span>${m.progreso}%</span></div><div class="progress"><div class="progress-bar" style="width:${m.progreso}%"></div></div></div></div><span class="tag ${m.estado==='En curso'?'green':m.estado==='Pendiente'?'yellow':'blue'}">${m.estado}</span></article>`).join('')}
 async function loadProfile(){if(currentUser.role==='admin'){toast('Los administradores administran alumnos desde su sección.');show('admin');return}currentProfile=(await api('/api/me')).profile;if(!currentProfile)return;for(const id of ['nombre','apellido','dni','email','telefono','carrera','direccion'])$('#'+id).value=currentProfile[id]||'';$('#profileName').textContent=`${currentProfile.nombre} ${currentProfile.apellido}`;$('#profileCareer').textContent=currentProfile.carrera||'';$('#profileStatus').textContent=currentProfile.estado||'Alumno regular';updateHeader()}
-async function saveProfile(){const body={};for(const id of ['nombre','apellido','dni','email','telefono','carrera','direccion'])body[id]=$('#'+id).value;try{const d=await api(`/api/alumno/${currentProfile.id}`,{method:'PUT',body:JSON.stringify(body)});currentProfile=d.profile;await loadMe();await loadProfile();toast('Datos guardados correctamente.')}catch(e){toast(e.message)}}
+async function saveProfile(){
+  if(!currentUser){
+    toast('No hay una sesión iniciada.');
+    return;
+  }
+
+  if(currentUser.role === 'admin'){
+    toast('Los administradores no tienen un perfil de alumno.');
+    return;
+  }
+
+  if(!currentProfile){
+    try{
+      const d = await api('/api/me');
+      currentProfile = d.profile;
+    }catch(e){
+      toast(e.message);
+      return;
+    }
+  }
+
+  if(!currentProfile){
+    toast('No se encontró el perfil del alumno.');
+    return;
+  }
+
+  const body = {};
+
+  for(const id of [
+    'nombre',
+    'apellido',
+    'dni',
+    'email',
+    'telefono',
+    'carrera',
+    'direccion'
+  ]){
+    body[id] = $('#' + id).value;
+  }
+
+  try{
+    const d = await api(`/api/alumno/${currentProfile.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    });
+
+    currentProfile = d.profile;
+
+    await loadMe();
+
+    $('#nombre').value = currentProfile.nombre || '';
+    $('#apellido').value = currentProfile.apellido || '';
+    $('#dni').value = currentProfile.dni || '';
+    $('#email').value = currentProfile.email || '';
+    $('#telefono').value = currentProfile.telefono || '';
+    $('#carrera').value = currentProfile.carrera || '';
+    $('#direccion').value = currentProfile.direccion || '';
+
+    $('#profileName').textContent =
+      `${currentProfile.nombre} ${currentProfile.apellido}`;
+
+    $('#profileCareer').textContent =
+      currentProfile.carrera || '';
+
+    $('#profileStatus').textContent =
+      currentProfile.estado || 'Alumno regular';
+
+    updateHeader();
+
+    toast('Datos guardados correctamente.');
+  }catch(e){
+    toast(e.message);
+  }
+}
 async function loadAdmin(){const rows=await api('/api/admin/alumnos');const tb=$('#adminTableBody');tb.innerHTML=rows.map(a=>`<tr><td>${a.nombre} ${a.apellido}</td><td>${a.username}</td><td>${a.email||''}</td><td>${a.estado||''}</td><td><button data-edit="${a.id}">Editar</button></td></tr>`).join('');tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>adminEdit(Number(b.dataset.edit)))}
 async function adminEdit(id){const a=await api('/api/alumno/'+id);const body={nombre:prompt('Nombre',a.nombre),apellido:prompt('Apellido',a.apellido),dni:prompt('DNI',a.dni||''),email:prompt('Email',a.email||''),telefono:prompt('Teléfono',a.telefono||''),carrera:prompt('Carrera',a.carrera||''),direccion:prompt('Dirección',a.direccion||'')};if(Object.values(body).some(v=>v===null))return;await api('/api/admin/alumno/'+id,{method:'PUT',body:JSON.stringify(body)});toast('Alumno actualizado.');loadAdmin()}
 
