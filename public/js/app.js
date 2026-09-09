@@ -5,24 +5,24 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show'
 function closeMenu(){sidebar.classList.remove('open');overlay.classList.remove('show')}
 function setActive(section){$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.section===section)); $('#pageTitle').textContent=section==='inicio'?'Inicio':section==='perfil'?'Mi perfil':section==='admin'?'Administrar alumnos':section==='admin-calendario'?'Editar calendario':section[0].toUpperCase()+section.slice(1)}
 function show(section){dashboardView.style.display=section==='inicio'?'block':'none';profileView.style.display=section==='perfil'?'block':'none';adminView.style.display=section==='admin'?'block':'none';calendarAdminView.style.display=section==='admin-calendario'?'block':'none';setActive(section);closeMenu();if(section==='perfil')loadProfile();if(section==='admin')loadAdmin();if(section==='admin-calendario')loadCalendarAdmin();if(section==='inicio')loadCalendar();if(!['inicio','perfil','admin','admin-calendario'].includes(section))toast(`Sección ${section}: lista para ampliar.`)}
-async function api(url,opts={}){
-  const r = await fetch(url,{
-    credentials:'include',
-    headers:{
-      'Content-Type':'application/json',
-      ...(opts.headers||{})
-    },
-    ...opts
+async function api(url, opts = {}) {
+  const r = await fetch(url, {
+    ...opts,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
   });
 
-  let data={};
+  let data = {};
 
-  try{
-    data=await r.json();
-  }catch{}
+  try {
+    data = await r.json();
+  } catch {}
 
-  if(!r.ok){
-    throw new Error(data.error||'Ocurrió un error.');
+  if (!r.ok) {
+    throw new Error(data.error || 'Ocurrió un error.');
   }
 
   return data;
