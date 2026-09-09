@@ -165,3 +165,85 @@ $('#refreshCalendar').onclick=loadCalendar;
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';try{const d=await api('/api/login',{method:'POST',body:JSON.stringify({username:$('#username').value,password:$('#password').value})});currentUser=d.user;loginView.classList.add('hidden');appView.classList.remove('hidden');await loadMe();await loadCourses()}catch(err){$('#loginError').textContent=err.message}});
 $$('.nav-item').forEach(n=>n.addEventListener('click',()=>show(n.dataset.section)));$('#menuToggle').onclick=()=>{sidebar.classList.toggle('open');overlay.classList.toggle('show')};overlay.onclick=closeMenu;$('#logoutBtn').onclick=async()=>{await api('/api/logout',{method:'POST'});location.reload()};$('#profileBtn').onclick=()=>show('perfil');$('#saveProfile').onclick=saveProfile;$('#reloadProfile').onclick=loadProfile;$('#notificationBtn').onclick=()=>toast('Tenés 3 notificaciones nuevas.');$('#viewCourses').onclick=()=>toast('Vista completa de materias disponible para ampliar.');$('#clearActivity').onclick=()=>toast('Actividad actualizada.');$('#searchInput').addEventListener('input',e=>{const q=e.target.value.toLowerCase().trim();$$('.course').forEach(c=>c.style.display=c.dataset.search.includes(q)?'':'none')});
 const f=new Intl.DateTimeFormat('es-AR',{day:'2-digit',month:'long',year:'numeric'});$('#currentDate').textContent=f.format(new Date());
+
+// ==============================
+// REGISTRO DE NUEVOS ALUMNOS
+// ==============================
+
+const showRegister = $('#showRegister');
+const showLogin = $('#showLogin');
+const registerBox = $('#registerBox');
+const registerForm = $('#registerForm');
+
+showRegister?.addEventListener('click', () => {
+  $('#loginForm').classList.add('hidden');
+  registerBox.classList.remove('hidden');
+});
+
+showLogin?.addEventListener('click', () => {
+  registerBox.classList.add('hidden');
+  $('#loginForm').classList.remove('hidden');
+  $('#registerError').textContent = '';
+});
+
+registerForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  $('#registerError').textContent = '';
+
+  const username = $('#regUsername').value.trim();
+  const password = $('#regPassword').value;
+  const password2 = $('#regPassword2').value;
+  const nombre = $('#regNombre').value.trim();
+  const apellido = $('#regApellido').value.trim();
+  const dni = $('#regDni').value.trim();
+  const email = $('#regEmail').value.trim();
+  const telefono = $('#regTelefono').value.trim();
+  const carrera = $('#regCarrera').value.trim();
+  const direccion = $('#regDireccion').value.trim();
+
+  if (password !== password2) {
+    $('#registerError').textContent =
+      'Las contraseñas no coinciden.';
+    return;
+  }
+
+  if (password.length < 6) {
+    $('#registerError').textContent =
+      'La contraseña debe tener al menos 6 caracteres.';
+    return;
+  }
+
+  try {
+
+    await api('/api/registro', {
+      method: 'POST',
+      body: JSON.stringify({
+        username,
+        password,
+        nombre,
+        apellido,
+        dni,
+        email,
+        telefono,
+        carrera,
+        direccion
+      })
+    });
+
+    toast('Cuenta creada correctamente.');
+
+    registerForm.reset();
+
+    registerBox.classList.add('hidden');
+    $('#loginForm').classList.remove('hidden');
+
+    $('#username').value = username;
+    $('#password').value = '';
+
+  } catch (error) {
+
+    $('#registerError').textContent = error.message;
+
+  }
+});

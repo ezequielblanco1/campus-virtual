@@ -190,210 +190,164 @@ app.get('/api/health', async (_req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Completá usuario y contraseña.' });
-    const result = await pool.query('SELECT id, username, password_hash, role FROM users WHERE username=$1', [username.trim()]);
-    if (!result.rows[0]) return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+
+    if (!username || !password) {
+      return res.status(400).json({
+        error: 'Completá usuario y contraseña.'
+      });
+    }
+
+    const result = await pool.query(
+      'SELECT id, username, password_hash, role FROM users WHERE username=$1',
+      [username.trim()]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(401).json({
+        error: 'Usuario o contraseña incorrectos.'
+      });
+    }
+
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
-    req.session.user = { id: user.id, username: user.username, role: user.role };
-    res.json({ ok: true, user: req.session.user });
+
+    const valid = await bcrypt.compare(
+      password,
+      user.password_hash
+    );
+
+    if (!valid) {
+      return res.status(401).json({
+        error: 'Usuario o contraseña incorrectos.'
+      });
+    }
+
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+
+    res.json({
+      ok: true,
+      user: req.session.user
+    });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Error interno del servidor.' });
+    res.status(500).json({
+      error: 'Error interno del servidor.'
+    });
   }
 });
+
+
+// =====================================
+// REGISTRO DE NUEVOS ALUMNOS
+// =====================================
+
+app.post('/api/registro', async (req, res) => {
+  try {
+    const {
+      username,
+      password,
+      nombre,
+      apellido,
+      dni,
+      email,
+      telefono,
+      carrera,
+      direccion
+    } = req.body;
+
+    if (!username || !password || !nombre || !apellido || !email) {
+      return res.status(400).json({
+        error: 'Usuario, contraseña, nombre, apellido y email son obligatorios.'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        error: 'La contraseña debe tener al menos 6 caracteres.'
+      });
+    }
+
+    const usernameLimpio = username.trim().toLowerCase();
+    const emailLimpio = email.trim();
+
+    const existente = await pool.query(
+      'SELECT id FROM users WHERE username=$1',
+      [usernameLimpio]
+    );
+
+    if (existente.rows[0]) {
+      return res.status(409).json({
+        error: 'Ese usuario ya existe.'
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const userResult = await pool.query(`
+      INSERT INTO users (username, password_hash, role)
+      VALUES ($1, $2, 'alumno')
+      RETURNING id, username, role
+    `, [
+      usernameLimpio,
+      passwordHash
+    ]);
+
+    const user = userResult.rows[0];
+
+    const alumnoResult = await pool.query(`
+      INSERT INTO alumnos (
+        user_id,
+        nombre,
+        apellido,
+        dni,
+        email,
+        telefono,
+        carrera,
+        direccion
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING
+        id,
+        nombre,
+        apellido,
+        dni,
+        email,
+        telefono,
+        carrera,
+        direccion,
+        estado
+    `, [
+      user.id,
+      nombre.trim(),
+      apellido.trim(),
+      (dni || '').trim(),
+      emailLimpio,
+      (telefono || '').trim(),
+      (carrera || '').trim(),
+      (direccion || '').trim()
+    ]);
+
+    res.status(201).json({
+      ok: true,
+      mensaje: 'Cuenta creada correctamente.',
+      user,
+      profile: alumnoResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error en registro:', error);
+
+    res.status(500).json({
+      error: 'No se pudo crear la cuenta.'
+    });
+  }
+});
+
 
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
-
-app.get('/api/me', requireAuth, async (req, res) => {
-  try {
-    if (req.session.user.role === 'admin') {
-      return res.json({ user: req.session.user, profile: null });
-    }
-    const result = await pool.query(`
-      SELECT a.id, a.nombre, a.apellido, a.dni, a.email, a.telefono, a.carrera, a.direccion, a.estado
-      FROM alumnos a WHERE a.user_id=$1
-    `, [req.session.user.id]);
-    res.json({ user: req.session.user, profile: result.rows[0] || null });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo cargar el perfil.' });
-  }
-});
-
-app.get('/api/alumno/:id', requireAuth, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (req.session.user.role !== 'admin') {
-      const own = await pool.query('SELECT id FROM alumnos WHERE user_id=$1', [req.session.user.id]);
-      if (!own.rows[0] || own.rows[0].id !== id) return res.status(403).json({ error: 'No autorizado.' });
-    }
-    const result = await pool.query(`
-      SELECT id, nombre, apellido, dni, email, telefono, carrera, direccion, estado
-      FROM alumnos WHERE id=$1
-    `, [id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Alumno no encontrado.' });
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo cargar el alumno.' });
-  }
-});
-
-app.put('/api/alumno/:id', requireAuth, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (req.session.user.role !== 'admin') {
-      const own = await pool.query('SELECT id FROM alumnos WHERE user_id=$1', [req.session.user.id]);
-      if (!own.rows[0] || own.rows[0].id !== id) return res.status(403).json({ error: 'No autorizado.' });
-    }
-
-    const { nombre, apellido, dni, email, telefono, carrera, direccion } = req.body;
-    if (!nombre || !apellido || !email) return res.status(400).json({ error: 'Nombre, apellido y email son obligatorios.' });
-
-    const result = await pool.query(`
-      UPDATE alumnos
-      SET nombre=$1, apellido=$2, dni=$3, email=$4, telefono=$5, carrera=$6, direccion=$7
-      WHERE id=$8
-      RETURNING id, nombre, apellido, dni, email, telefono, carrera, direccion, estado
-    `, [nombre.trim(), apellido.trim(), (dni || '').trim(), email.trim(), (telefono || '').trim(), (carrera || '').trim(), (direccion || '').trim(), id]);
-
-    if (!result.rows[0]) return res.status(404).json({ error: 'Alumno no encontrado.' });
-    res.json({ ok: true, mensaje: 'Datos actualizados correctamente.', profile: result.rows[0] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudieron guardar los cambios.' });
-  }
-});
-
-
-app.get('/api/calendario', requireAuth, async (_req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT id, titulo, TO_CHAR(fecha, 'YYYY-MM-DD') AS fecha, tipo, descripcion
-      FROM eventos_calendario
-      ORDER BY fecha, id
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo cargar el calendario.' });
-  }
-});
-
-app.post('/api/admin/calendario', requireAdmin, async (req, res) => {
-  try {
-    const { titulo, fecha, tipo, descripcion } = req.body;
-    if (!titulo || !fecha) return res.status(400).json({ error: 'Título y fecha son obligatorios.' });
-    const result = await pool.query(`
-      INSERT INTO eventos_calendario (titulo, fecha, tipo, descripcion)
-      VALUES ($1,$2,$3,$4)
-      RETURNING id, titulo, TO_CHAR(fecha, 'YYYY-MM-DD') AS fecha, tipo, descripcion
-    `, [titulo.trim(), fecha, (tipo || 'Académico').trim(), (descripcion || '').trim()]);
-    res.status(201).json({ ok: true, evento: result.rows[0] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo crear el evento.' });
-  }
-});
-
-app.put('/api/admin/calendario/:id', requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { titulo, fecha, tipo, descripcion } = req.body;
-    if (!titulo || !fecha) return res.status(400).json({ error: 'Título y fecha son obligatorios.' });
-    const result = await pool.query(`
-      UPDATE eventos_calendario
-      SET titulo=$1, fecha=$2, tipo=$3, descripcion=$4
-      WHERE id=$5
-      RETURNING id, titulo, TO_CHAR(fecha, 'YYYY-MM-DD') AS fecha, tipo, descripcion
-    `, [titulo.trim(), fecha, (tipo || 'Académico').trim(), (descripcion || '').trim(), id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Evento no encontrado.' });
-    res.json({ ok: true, evento: result.rows[0] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo actualizar el evento.' });
-  }
-});
-
-app.delete('/api/admin/calendario/:id', requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const result = await pool.query('DELETE FROM eventos_calendario WHERE id=$1 RETURNING id', [id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Evento no encontrado.' });
-    res.json({ ok: true, mensaje: 'Evento eliminado.' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo eliminar el evento.' });
-  }
-});
-
-app.get('/api/materias', requireAuth, async (req, res) => {
-  try {
-    if (req.session.user.role === 'admin') {
-      const result = await pool.query('SELECT id,nombre,codigo,progreso,estado FROM materias ORDER BY id');
-      return res.json(result.rows);
-    }
-    const result = await pool.query(`
-      SELECT m.id,m.nombre,m.codigo,m.progreso,m.estado
-      FROM materias m
-      JOIN inscripciones i ON i.materia_id=m.id
-      JOIN alumnos a ON a.id=i.alumno_id
-      WHERE a.user_id=$1 ORDER BY m.id
-    `, [req.session.user.id]);
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudieron cargar las materias.' });
-  }
-});
-
-app.get('/api/admin/alumnos', requireAdmin, async (_req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT a.id, a.nombre, a.apellido, a.dni, a.email, a.telefono, a.carrera, a.estado, u.username
-      FROM alumnos a JOIN users u ON u.id=a.user_id ORDER BY a.apellido, a.nombre
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudieron cargar los alumnos.' });
-  }
-});
-
-app.put('/api/admin/alumno/:id', requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { nombre, apellido, dni, email, telefono, carrera, direccion } = req.body;
-    if (!nombre || !apellido || !email) return res.status(400).json({ error: 'Nombre, apellido y email son obligatorios.' });
-    const result = await pool.query(`
-      UPDATE alumnos
-      SET nombre=$1, apellido=$2, dni=$3, email=$4, telefono=$5, carrera=$6, direccion=$7
-      WHERE id=$8
-      RETURNING id, nombre, apellido, dni, email, telefono, carrera, direccion, estado
-    `, [nombre.trim(), apellido.trim(), (dni || '').trim(), email.trim(), (telefono || '').trim(), (carrera || '').trim(), (direccion || '').trim(), id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Alumno no encontrado.' });
-    res.json({ ok: true, mensaje: 'Alumno actualizado correctamente.', profile: result.rows[0] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'No se pudo actualizar el alumno.' });
-  }
-});
-
-app.use((_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-initDatabase()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Campus Virtual ejecutándose en http://localhost:${PORT}`);
-    });
-  })
-  .catch(error => {
-    console.error('No se pudo inicializar la aplicación:', error);
-    process.exit(1);
-  });
