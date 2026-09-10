@@ -37,7 +37,7 @@ if (overlay) overlay.classList.remove('show');
 
 function setActive(section) {
 
-$$$('.nav-item').forEach(x => {
+$$('.nav-item').forEach(x => {
   x.classList.toggle('active', x.dataset.section === section);
 });
 
@@ -1194,4 +1194,3 @@ async e => {
   }
 }
 );
-$$$
