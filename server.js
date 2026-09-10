@@ -4,6 +4,8 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const PDFDocument = require('pdfkit');
+const QRCode = require('qrcode');
 require('dotenv').config();
 
 const app = express();
@@ -12,6 +14,7 @@ app.set('trust proxy', 1);
 
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
+const CAMPUS_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
 if (!DATABASE_URL) {
   console.warn('ADVERTENCIA: DATABASE_URL no está configurada. En Render debes crearla como variable de entorno.');
@@ -495,6 +498,98 @@ app.put('/api/admin/alumno/:id', requireAdmin, async (req, res) => {
 });
 
 // =====================================
+// CERTIFICADO DE ALUMNO REGULAR (PDF + QR)
+// =====================================
+
+// El propio alumno descarga el suyo, o el admin lo genera para cualquier alumno
+app.get('/api/alumno/:id/certificado', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.session.user.role !== 'admin') {
+      const propio = await pool.query('SELECT id FROM alumnos WHERE id=$1 AND user_id=$2', [id, req.session.user.id]);
+      if (!propio.rows[0]) {
+        return res.status(403).json({ error: 'No podés descargar este certificado.' });
+      }
+    }
+
+    const result = await pool.query(
+      'SELECT nombre, apellido, dni, carrera, estado FROM alumnos WHERE id=$1',
+      [id]
+    );
+
+    const alumno = result.rows[0];
+
+    if (!alumno) {
+      return res.status(404).json({ error: 'Alumno no encontrado.' });
+    }
+
+    const qrDataUrl = await QRCode.toDataURL(CAMPUS_URL, { margin: 1, width: 200 });
+    const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+
+    const fecha = new Intl.DateTimeFormat('es-AR', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    }).format(new Date());
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="certificado-${alumno.apellido}-${alumno.nombre}.pdf"`);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    doc.pipe(res);
+
+    // Recuadro general de la constancia
+    doc.rect(30, 30, doc.page.width - 60, doc.page.height - 60).stroke('#172033');
+
+    // Encabezado institucional
+    doc.font('Helvetica-Bold').fontSize(16).text('CAMPUS VIRTUAL', 50, 55, { align: 'center' });
+    doc.font('Helvetica').fontSize(9).fillColor('#667085')
+      .text('Plataforma académica · Documento generado digitalmente', { align: 'center' });
+    doc.fillColor('black');
+    doc.moveDown(1.5);
+
+    doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke('#e5e7eb');
+    doc.moveDown(1.2);
+
+    doc.font('Times-Bold').fontSize(15).text('CONSTANCIA DE ALUMNO REGULAR', { align: 'center', underline: true });
+    doc.moveDown(2);
+
+    // Texto de la constancia
+    doc.font('Times-Roman').fontSize(12).text(
+      `Se deja constancia de que, a la fecha, ${alumno.nombre} ${alumno.apellido}, ` +
+      `DNI N° ${alumno.dni || 'no registrado'}, reviste la condición de "${alumno.estado || 'Alumno regular'}" ` +
+      `en la carrera de ${alumno.carrera || 'no registrada'}, dictada en Campus Virtual.`,
+      { align: 'justify', lineGap: 5 }
+    );
+    doc.moveDown(1.5);
+
+    doc.text(
+      'A pedido del/la interesado/a y para ser presentada ante quien corresponda, ' +
+      `se extiende la presente en formato digital, con fecha ${fecha}.`,
+      { align: 'justify', lineGap: 5 }
+    );
+    doc.moveDown(4);
+
+    // Firma
+    const firmaY = doc.y;
+    doc.moveTo(80, firmaY).lineTo(280, firmaY).stroke('#172033');
+    doc.font('Helvetica').fontSize(9)
+      .text('Firma y sello de Campus Virtual', 80, firmaY + 5, { width: 200, align: 'center' });
+
+    // QR de verificación / acceso
+    const qrX = doc.page.width - 50 - 110;
+    doc.image(qrBuffer, qrX, firmaY - 55, { width: 110 });
+    doc.fontSize(8).fillColor('#667085')
+      .text('Escaneá para acceder al Campus Virtual', qrX - 15, firmaY + 58, { width: 140, align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error('Error al generar certificado:', error);
+    res.status(500).json({ error: 'No se pudo generar el certificado.' });
+  }
+});
+
+
+// =====================================
 // CALENDARIO
 // =====================================
 
@@ -592,4 +687,3 @@ initDatabase()
     console.error('Error al inicializar la base de datos:', error);
     process.exit(1);
   });
-  

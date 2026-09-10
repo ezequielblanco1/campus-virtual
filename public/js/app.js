@@ -410,6 +410,22 @@ try {
 }
 
 
+function descargarCertificado(id) {
+  window.open(`/api/alumno/${id}/certificado`, '_blank');
+}
+
+$('#downloadCert')?.addEventListener(
+'click',
+() => {
+  if (!currentProfile?.id) {
+    toast('No se encontró tu perfil de alumno.');
+    return;
+  }
+  descargarCertificado(currentProfile.id);
+}
+);
+
+
 // =====================================
 // ADMINISTRACIÓN DE ALUMNOS
 // =====================================
@@ -431,6 +447,9 @@ try {
         <button data-edit="${a.id}">
           Editar
         </button>
+        <button data-cert="${a.id}">
+          Certificado
+        </button>
       </td>
     </tr>
   `).join('');
@@ -439,6 +458,12 @@ try {
     .forEach(b => {
       b.onclick = () =>
         adminEdit(Number(b.dataset.edit));
+    });
+
+  tb.querySelectorAll('[data-cert]')
+    .forEach(b => {
+      b.onclick = () =>
+        descargarCertificado(Number(b.dataset.cert));
     });
 
 } catch (e) {
