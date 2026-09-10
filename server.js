@@ -351,3 +351,225 @@ app.post('/api/registro', async (req, res) => {
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
+
+// =====================================
+// SESIÓN ACTUAL
+// =====================================
+
+app.get('/api/session', requireAuth, (req, res) => {
+  res.json({ ok: true, user: req.session.user });
+});
+
+// =====================================
+// ALUMNOS
+// =====================================
+
+// Listado completo de alumnos (solo admin)
+app.get('/api/alumnos', requireAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT a.id, a.nombre, a.apellido, a.dni, a.email, a.telefono,
+             a.carrera, a.direccion, a.estado, u.username
+      FROM alumnos a
+      JOIN users u ON u.id = a.user_id
+      ORDER BY a.apellido, a.nombre
+    `);
+    res.json({ ok: true, alumnos: result.rows });
+  } catch (error) {
+    console.error('Error al listar alumnos:', error);
+    res.status(500).json({ error: 'No se pudo obtener el listado de alumnos.' });
+  }
+});
+
+// Perfil propio del alumno logueado
+app.get('/api/alumnos/me', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, nombre, apellido, dni, email, telefono, carrera, direccion, estado FROM alumnos WHERE user_id=$1',
+      [req.session.user.id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'Perfil de alumno no encontrado.' });
+    }
+
+    res.json({ ok: true, alumno: result.rows[0] });
+  } catch (error) {
+    console.error('Error al obtener perfil:', error);
+    res.status(500).json({ error: 'No se pudo obtener el perfil.' });
+  }
+});
+
+// Actualizar datos propios del alumno logueado
+app.put('/api/alumnos/me', requireAuth, async (req, res) => {
+  try {
+    const { telefono, direccion, email } = req.body;
+
+    const result = await pool.query(`
+      UPDATE alumnos
+      SET telefono = COALESCE($1, telefono),
+          direccion = COALESCE($2, direccion),
+          email = COALESCE($3, email)
+      WHERE user_id = $4
+      RETURNING id, nombre, apellido, dni, email, telefono, carrera, direccion, estado
+    `, [telefono, direccion, email, req.session.user.id]);
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'Perfil de alumno no encontrado.' });
+    }
+
+    res.json({ ok: true, alumno: result.rows[0] });
+  } catch (error) {
+    console.error('Error al actualizar perfil:', error);
+    res.status(500).json({ error: 'No se pudo actualizar el perfil.' });
+  }
+});
+
+// =====================================
+// MATERIAS
+// =====================================
+
+// Listado general de materias
+app.get('/api/materias', requireAuth, async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT id, nombre, codigo, progreso, estado FROM materias ORDER BY nombre');
+    res.json({ ok: true, materias: result.rows });
+  } catch (error) {
+    console.error('Error al listar materias:', error);
+    res.status(500).json({ error: 'No se pudieron obtener las materias.' });
+  }
+});
+
+// Materias en las que está inscripto el alumno logueado
+app.get('/api/mis-materias', requireAuth, async (req, res) => {
+  try {
+    const alumno = await pool.query('SELECT id FROM alumnos WHERE user_id=$1', [req.session.user.id]);
+
+    if (!alumno.rows[0]) {
+      return res.status(404).json({ error: 'Perfil de alumno no encontrado.' });
+    }
+
+    const result = await pool.query(`
+      SELECT m.id, m.nombre, m.codigo, m.progreso, m.estado
+      FROM inscripciones i
+      JOIN materias m ON m.id = i.materia_id
+      WHERE i.alumno_id = $1
+      ORDER BY m.nombre
+    `, [alumno.rows[0].id]);
+
+    res.json({ ok: true, materias: result.rows });
+  } catch (error) {
+    console.error('Error al listar mis materias:', error);
+    res.status(500).json({ error: 'No se pudieron obtener tus materias.' });
+  }
+});
+
+// =====================================
+// CALIFICACIONES
+// =====================================
+
+// Notas del alumno logueado (o de un alumno puntual si es admin)
+app.get('/api/calificaciones', requireAuth, async (req, res) => {
+  try {
+    let alumnoId;
+
+    if (req.session.user.role === 'admin' && req.query.alumno_id) {
+      alumnoId = req.query.alumno_id;
+    } else {
+      const alumno = await pool.query('SELECT id FROM alumnos WHERE user_id=$1', [req.session.user.id]);
+      if (!alumno.rows[0]) {
+        return res.status(404).json({ error: 'Perfil de alumno no encontrado.' });
+      }
+      alumnoId = alumno.rows[0].id;
+    }
+
+    const result = await pool.query(`
+      SELECT c.id, c.nota, c.fecha, m.nombre AS materia, m.codigo
+      FROM calificaciones c
+      JOIN materias m ON m.id = c.materia_id
+      WHERE c.alumno_id = $1
+      ORDER BY c.fecha DESC
+    `, [alumnoId]);
+
+    res.json({ ok: true, calificaciones: result.rows });
+  } catch (error) {
+    console.error('Error al listar calificaciones:', error);
+    res.status(500).json({ error: 'No se pudieron obtener las calificaciones.' });
+  }
+});
+
+// Cargar una nota (solo admin)
+app.post('/api/calificaciones', requireAdmin, async (req, res) => {
+  try {
+    const { alumno_id, materia_id, nota, fecha } = req.body;
+
+    if (!alumno_id || !materia_id || nota === undefined) {
+      return res.status(400).json({ error: 'Alumno, materia y nota son obligatorios.' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO calificaciones (alumno_id, materia_id, nota, fecha)
+      VALUES ($1, $2, $3, COALESCE($4, CURRENT_DATE))
+      RETURNING id, alumno_id, materia_id, nota, fecha
+    `, [alumno_id, materia_id, nota, fecha || null]);
+
+    res.status(201).json({ ok: true, calificacion: result.rows[0] });
+  } catch (error) {
+    console.error('Error al cargar calificación:', error);
+    res.status(500).json({ error: 'No se pudo cargar la calificación.' });
+  }
+});
+
+// =====================================
+// CALENDARIO
+// =====================================
+
+// Listado de eventos del calendario académico
+app.get('/api/calendario', requireAuth, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, titulo, fecha, tipo, descripcion FROM eventos_calendario ORDER BY fecha ASC'
+    );
+    res.json({ ok: true, eventos: result.rows });
+  } catch (error) {
+    console.error('Error al listar eventos:', error);
+    res.status(500).json({ error: 'No se pudieron obtener los eventos.' });
+  }
+});
+
+// Crear un nuevo evento (solo admin)
+app.post('/api/calendario', requireAdmin, async (req, res) => {
+  try {
+    const { titulo, fecha, tipo, descripcion } = req.body;
+
+    if (!titulo || !fecha) {
+      return res.status(400).json({ error: 'Título y fecha son obligatorios.' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO eventos_calendario (titulo, fecha, tipo, descripcion)
+      VALUES ($1, $2, COALESCE($3, 'Académico'), COALESCE($4, ''))
+      RETURNING id, titulo, fecha, tipo, descripcion
+    `, [titulo, fecha, tipo, descripcion]);
+
+    res.status(201).json({ ok: true, evento: result.rows[0] });
+  } catch (error) {
+    console.error('Error al crear evento:', error);
+    res.status(500).json({ error: 'No se pudo crear el evento.' });
+  }
+});
+
+// =====================================
+// INICIO DEL SERVIDOR
+// =====================================
+
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Servidor escuchando en el puerto ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Error al inicializar la base de datos:', error);
+    process.exit(1);
+  });
