@@ -20,7 +20,6 @@ const overlay = $('#overlay');
 
 function toast(msg) {
 const t = $('#toast');
-
 if (!t) return;
 
 t.textContent = msg;
@@ -43,7 +42,6 @@ $$$('.nav-item').forEach(x => {
 });
 
 const pageTitle = $('#pageTitle');
-
 if (!pageTitle) return;
 
 pageTitle.textContent =
@@ -57,7 +55,6 @@ pageTitle.textContent =
     ? 'Editar calendario'
     : section[0].toUpperCase() + section.slice(1);
 }
-
 
 function show(section) {
 if (dashboardView) {
@@ -83,30 +80,12 @@ if (calendarAdminView) {
 setActive(section);
 closeMenu();
 
-if (section === 'perfil') {
-  loadProfile();
-}
+if (section === 'perfil') loadProfile();
+if (section === 'admin') loadAdmin();
+if (section === 'admin-calendario') loadCalendarAdmin();
+if (section === 'inicio') loadCalendar();
 
-if (section === 'admin') {
-  loadAdmin();
-}
-
-if (section === 'admin-calendario') {
-  loadCalendarAdmin();
-}
-
-if (section === 'inicio') {
-  loadCalendar();
-}
-
-if (
-  ![
-    'inicio',
-    'perfil',
-    'admin',
-    'admin-calendario'
-  ].includes(section)
-) {
+if (!['inicio', 'perfil', 'admin', 'admin-calendario'].includes(section)) {
   toast(`Sección ${section}: lista para ampliar.`);
 }
 }
@@ -155,7 +134,6 @@ currentProfile = d.profile;
 updateHeader();
 
 if (currentUser.role === 'admin') {
-
   $('#adminNav')?.classList.remove('hidden');
   $('#calendarAdminNav')?.classList.remove('hidden');
 
@@ -172,14 +150,12 @@ if (currentUser.role === 'admin') {
     'Administración del Campus Virtual';
 
 } else {
-
   $('#adminNav')?.classList.add('hidden');
   $('#calendarAdminNav')?.classList.add('hidden');
 
-  const full =
-    currentProfile
-      ? `${currentProfile.nombre} ${currentProfile.apellido}`
-      : 'Estudiante';
+  const full = currentProfile
+    ? `${currentProfile.nombre} ${currentProfile.apellido}`
+    : 'Estudiante';
 
   $('#welcomeTitle').textContent =
     `¡Hola, ${currentProfile?.nombre || 'estudiante'}! 👋`;
@@ -187,9 +163,7 @@ if (currentUser.role === 'admin') {
   $('#welcomeText').textContent =
     'Bienvenido/a a tu campus virtual. Desde aquí podés consultar tu información académica.';
 
-  $('#profileName').textContent =
-    full;
-
+  $('#profileName').textContent = full;
   $('#profileCareer').textContent =
     currentProfile?.carrera || '';
 }
@@ -204,7 +178,6 @@ $('#miniRole').textContent =
     ? 'Administrador'
     : 'Alumno';
 }
-
 
 function updateHeader() {
 if (!currentUser) return;
@@ -227,7 +200,6 @@ $('#profileAvatar').textContent = text;
 // =====================================
 
 async function loadCourses() {
-
 if (!currentUser) return;
 
 if (currentUser.role === 'admin') {
@@ -240,7 +212,6 @@ const rows = await api('/api/materias');
 $('#statMaterias').textContent = rows.length;
 
 const list = $('#courseList');
-
 if (!list) return;
 
 list.innerHTML = rows.map(m => `
@@ -248,13 +219,11 @@ list.innerHTML = rows.map(m => `
     class="course"
     data-search="${m.nombre.toLowerCase()}"
   >
-
     <div class="course-icon">
       ${m.codigo.substring(0, 3)}
     </div>
 
     <div>
-
       <h4>${m.nombre}</h4>
 
       <small>
@@ -262,7 +231,6 @@ list.innerHTML = rows.map(m => `
       </small>
 
       <div class="progress-wrap">
-
         <div class="progress-info">
           <span>Progreso</span>
           <span>${m.progreso}%</span>
@@ -274,23 +242,18 @@ list.innerHTML = rows.map(m => `
             style="width:${m.progreso}%"
           ></div>
         </div>
-
       </div>
-
     </div>
 
-    <span
-      class="tag ${
-        m.estado === 'En curso'
-          ? 'green'
-          : m.estado === 'Pendiente'
-          ? 'yellow'
-          : 'blue'
-      }"
-    >
+    <span class="tag ${
+      m.estado === 'En curso'
+        ? 'green'
+        : m.estado === 'Pendiente'
+        ? 'yellow'
+        : 'blue'
+    }">
       ${m.estado}
     </span>
-
   </article>
 `).join('');
 }
@@ -301,7 +264,6 @@ list.innerHTML = rows.map(m => `
 // =====================================
 
 async function loadProfile() {
-
 if (!currentUser) {
   toast('No hay una sesión iniciada.');
   return;
@@ -311,13 +273,11 @@ if (currentUser.role === 'admin') {
   toast(
     'Los administradores administran alumnos desde su sección.'
   );
-
   show('admin');
   return;
 }
 
 try {
-
   const d = await api('/api/me');
 
   currentProfile = d.profile;
@@ -339,8 +299,7 @@ try {
     const element = $('#' + id);
 
     if (element) {
-      element.value =
-        currentProfile[id] || '';
+      element.value = currentProfile[id] || '';
     }
   }
 
@@ -356,15 +315,11 @@ try {
   updateHeader();
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
-
 
 async function saveProfile() {
-
 if (!currentUser) {
   toast('No hay una sesión iniciada.');
   return;
@@ -378,18 +333,12 @@ if (currentUser.role === 'admin') {
 }
 
 if (!currentProfile) {
-
   try {
-
     const d = await api('/api/me');
-
     currentProfile = d.profile;
-
   } catch (e) {
-
     toast(e.message);
     return;
-
   }
 }
 
@@ -409,16 +358,11 @@ for (const id of [
   'carrera',
   'direccion'
 ]) {
-
   const element = $('#' + id);
-
-  body[id] = element
-    ? element.value
-    : '';
+  body[id] = element ? element.value : '';
 }
 
 try {
-
   const d = await api(
     `/api/alumno/${currentProfile.id}`,
     {
@@ -440,12 +384,10 @@ try {
     'carrera',
     'direccion'
   ]) {
-
     const element = $('#' + id);
 
     if (element) {
-      element.value =
-        currentProfile[id] || '';
+      element.value = currentProfile[id] || '';
     }
   }
 
@@ -463,9 +405,7 @@ try {
   toast('Datos guardados correctamente.');
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
 
@@ -475,70 +415,40 @@ try {
 // =====================================
 
 async function loadAdmin() {
-
 try {
-
-  const rows =
-    await api('/api/admin/alumnos');
-
-  const tb =
-    $('#adminTableBody');
+  const rows = await api('/api/admin/alumnos');
+  const tb = $('#adminTableBody');
 
   if (!tb) return;
 
-  tb.innerHTML =
-    rows.map(a => `
-      <tr>
-
-        <td>
-          ${a.nombre} ${a.apellido}
-        </td>
-
-        <td>
-          ${a.username}
-        </td>
-
-        <td>
-          ${a.email || ''}
-        </td>
-
-        <td>
-          ${a.estado || ''}
-        </td>
-
-        <td>
-          <button data-edit="${a.id}">
-            Editar
-          </button>
-        </td>
-
-      </tr>
-    `).join('');
+  tb.innerHTML = rows.map(a => `
+    <tr>
+      <td>${a.nombre} ${a.apellido}</td>
+      <td>${a.username}</td>
+      <td>${a.email || ''}</td>
+      <td>${a.estado || ''}</td>
+      <td>
+        <button data-edit="${a.id}">
+          Editar
+        </button>
+      </td>
+    </tr>
+  `).join('');
 
   tb.querySelectorAll('[data-edit]')
     .forEach(b => {
-
       b.onclick = () =>
-        adminEdit(
-          Number(b.dataset.edit)
-        );
-
+        adminEdit(Number(b.dataset.edit));
     });
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
-
 
 async function adminEdit(id) {
-
 try {
-
-  const a =
-    await api('/api/alumno/' + id);
+  const a = await api('/api/alumno/' + id);
 
   const body = {
     nombre:
@@ -560,10 +470,7 @@ try {
       prompt('Carrera', a.carrera || ''),
 
     direccion:
-      prompt(
-        'Dirección',
-        a.direccion || ''
-      )
+      prompt('Dirección', a.direccion || '')
   };
 
   if (
@@ -586,9 +493,7 @@ try {
   await loadAdmin();
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
 
@@ -598,44 +503,27 @@ try {
 // =====================================
 
 async function loadCalendar() {
-
 try {
-
   calendarEvents =
     await api('/api/calendario');
 
   renderCalendar();
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
-
 
 function renderCalendar() {
+const grid = $('#calendarGrid');
+const title = $('#calendarMonthTitle');
+const eventsBox = $('#calendarEvents');
 
-const grid =
-  $('#calendarGrid');
-
-const title =
-  $('#calendarMonthTitle');
-
-const eventsBox =
-  $('#calendarEvents');
-
-if (!grid || !title) {
-  return;
-}
+if (!grid || !title) return;
 
 const now = new Date();
-
-const year =
-  now.getFullYear();
-
-const month =
-  now.getMonth();
+const year = now.getFullYear();
+const month = now.getMonth();
 
 title.textContent =
   new Intl.DateTimeFormat(
@@ -646,8 +534,7 @@ title.textContent =
     }
   ).format(now);
 
-const first =
-  new Date(year, month, 1);
+const first = new Date(year, month, 1);
 
 const days =
   new Date(
@@ -674,8 +561,7 @@ for (
   i < mondayIndex;
   i++
 ) {
-  grid.innerHTML +=
-    '<div></div>';
+  grid.innerHTML += '<div></div>';
 }
 
 const today =
@@ -688,7 +574,6 @@ for (
   day <= days;
   day++
 ) {
-
   const ds =
     `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -701,13 +586,11 @@ for (
     ds === today;
 
   grid.innerHTML += `
-    <div
-      class="${
-        isToday ? 'today ' : ''
-      }${
-        has ? 'event' : ''
-      }"
-    >
+    <div class="${
+      isToday ? 'today ' : ''
+    }${
+      has ? 'event' : ''
+    }">
       ${day}
       ${
         has
@@ -729,7 +612,6 @@ eventsBox.innerHTML =
   upcoming.length
     ? upcoming.map(e => `
         <div class="announcement">
-
           <strong>
             📅 ${e.fecha} · ${e.titulo}
           </strong>
@@ -742,7 +624,6 @@ eventsBox.innerHTML =
                 : ''
             }
           </p>
-
         </div>
       `).join('')
     : `
@@ -758,9 +639,7 @@ eventsBox.innerHTML =
 // =====================================
 
 async function loadCalendarAdmin() {
-
 try {
-
   calendarEvents =
     await api('/api/calendario');
 
@@ -770,53 +649,31 @@ try {
   if (!tb) return;
 
   tb.innerHTML =
-    calendarEvents
-      .map(e => `
-        <tr>
+    calendarEvents.map(e => `
+      <tr>
+        <td>${e.fecha}</td>
+        <td>${e.titulo}</td>
+        <td>${e.tipo || ''}</td>
+        <td>${e.descripcion || ''}</td>
 
-          <td>
-            ${e.fecha}
-          </td>
+        <td>
+          <button data-edit-cal="${e.id}">
+            Editar
+          </button>
 
-          <td>
-            ${e.titulo}
-          </td>
-
-          <td>
-            ${e.tipo || ''}
-          </td>
-
-          <td>
-            ${e.descripcion || ''}
-          </td>
-
-          <td>
-
-            <button
-              data-edit-cal="${e.id}"
-            >
-              Editar
-            </button>
-
-            <button
-              data-delete-cal="${e.id}"
-              style="background:#fee2e2;color:#991b1b"
-            >
-              Eliminar
-            </button>
-
-          </td>
-
-        </tr>
-      `)
-      .join('')
+          <button
+            data-delete-cal="${e.id}"
+            style="background:#fee2e2;color:#991b1b"
+          >
+            Eliminar
+          </button>
+        </td>
+      </tr>
+    `).join('')
     ||
     `
       <tr>
-        <td
-          colspan="5"
-          class="empty"
-        >
+        <td colspan="5" class="empty">
           No hay eventos.
         </td>
       </tr>
@@ -824,34 +681,26 @@ try {
 
   tb.querySelectorAll('[data-edit-cal]')
     .forEach(b => {
-
       b.onclick = () =>
         editCalendar(
           Number(b.dataset.editCal)
         );
-
     });
 
   tb.querySelectorAll('[data-delete-cal]')
     .forEach(b => {
-
       b.onclick = () =>
         deleteCalendar(
           Number(b.dataset.deleteCal)
         );
-
     });
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
-
 
 function editCalendar(id) {
-
 const e =
   calendarEvents.find(
     x => x.id === id
@@ -859,18 +708,11 @@ const e =
 
 if (!e) return;
 
-$('#eventoId').value =
-  e.id;
-
-$('#eventoTitulo').value =
-  e.titulo;
-
-$('#eventoFecha').value =
-  e.fecha;
-
+$('#eventoId').value = e.id;
+$('#eventoTitulo').value = e.titulo;
+$('#eventoFecha').value = e.fecha;
 $('#eventoTipo').value =
   e.tipo || 'Académico';
-
 $('#eventoDescripcion').value =
   e.descripcion || '';
 
@@ -883,31 +725,17 @@ window.scrollTo({
 });
 }
 
-
 function resetCalendarForm() {
-
-$('#eventoId').value =
-  '';
-
-$('#eventoTitulo').value =
-  '';
-
-$('#eventoFecha').value =
-  '';
-
-$('#eventoTipo').value =
-  'Académico';
-
-$('#eventoDescripcion').value =
-  '';
-
+$('#eventoId').value = '';
+$('#eventoTitulo').value = '';
+$('#eventoFecha').value = '';
+$('#eventoTipo').value = 'Académico';
+$('#eventoDescripcion').value = '';
 $('#calendarSubmit').textContent =
   'Agregar evento';
 }
 
-
 async function deleteCalendar(id) {
-
 if (
   !confirm(
     '¿Querés eliminar este evento?'
@@ -917,7 +745,6 @@ if (
 }
 
 try {
-
   await api(
     '/api/admin/calendario/' + id,
     {
@@ -931,21 +758,18 @@ try {
   await loadCalendar();
 
 } catch (e) {
-
   toast(e.message);
-
 }
 }
 
 
 // =====================================
-// EVENTOS DEL CALENDARIO
+// FORMULARIO CALENDARIO
 // =====================================
 
 $('#calendarForm')?.addEventListener(
 'submit',
 async e => {
-
   e.preventDefault();
 
   const id =
@@ -966,7 +790,6 @@ async e => {
   };
 
   try {
-
     await api(
       id
         ? '/api/admin/calendario/' + id
@@ -993,19 +816,15 @@ async e => {
     await loadCalendar();
 
   } catch (err) {
-
     toast(err.message);
-
   }
 }
 );
-
 
 $('#calendarCancel')?.addEventListener(
 'click',
 resetCalendarForm
 );
-
 
 $('#refreshCalendar')?.addEventListener(
 'click',
@@ -1020,31 +839,27 @@ loadCalendar
 $('#loginForm')?.addEventListener(
 'submit',
 async e => {
-
   e.preventDefault();
 
   $('#loginError').textContent = '';
 
   try {
-
     const d =
       await api(
         '/api/login',
         {
           method: 'POST',
-          body:
-            JSON.stringify({
-              username:
-                $('#username').value,
+          body: JSON.stringify({
+            username:
+              $('#username').value,
 
-              password:
-                $('#password').value
-            })
+            password:
+              $('#password').value
+          })
         }
       );
 
-    currentUser =
-      d.user;
+    currentUser = d.user;
 
     loginView.classList.add('hidden');
     appView.classList.remove('hidden');
@@ -1053,10 +868,8 @@ async e => {
     await loadCourses();
 
   } catch (err) {
-
     $('#loginError').textContent =
       err.message;
-
   }
 }
 );
@@ -1066,29 +879,20 @@ async e => {
 // NAVEGACIÓN
 // =====================================
 
-$$('.nav-item')
-.forEach(n => {
-
-  n.addEventListener(
-    'click',
-    () => show(
-      n.dataset.section
-    )
-  );
-
+$$('.nav-item').forEach(n => {
+n.addEventListener(
+  'click',
+  () => show(n.dataset.section)
+);
 });
-
 
 $('#menuToggle')?.addEventListener(
 'click',
 () => {
-
   sidebar.classList.toggle('open');
   overlay.classList.toggle('show');
-
 }
 );
-
 
 overlay?.addEventListener(
 'click',
@@ -1105,18 +909,14 @@ $('#logoutBtn')?.addEventListener(
 async () => {
 
   try {
-
     await api(
       '/api/logout',
       {
         method: 'POST'
       }
     );
-
   } catch (e) {
-
     console.error(e);
-
   }
 
   location.reload();
@@ -1125,7 +925,7 @@ async () => {
 
 
 // =====================================
-// PERFIL / BOTONES
+// BOTONES DE PERFIL
 // =====================================
 
 $('#profileBtn')?.addEventListener(
@@ -1133,40 +933,38 @@ $('#profileBtn')?.addEventListener(
 () => show('perfil')
 );
 
-
 $('#saveProfile')?.addEventListener(
 'click',
 saveProfile
 );
-
 
 $('#reloadProfile')?.addEventListener(
 'click',
 loadProfile
 );
 
-
 $('#notificationBtn')?.addEventListener(
 'click',
-() => toast(
-  'Tenés 3 notificaciones nuevas.'
-)
+() =>
+  toast(
+    'Tenés 3 notificaciones nuevas.'
+  )
 );
-
 
 $('#viewCourses')?.addEventListener(
 'click',
-() => toast(
-  'Vista completa de materias disponible para ampliar.'
-)
+() =>
+  toast(
+    'Vista completa de materias disponible para ampliar.'
+  )
 );
-
 
 $('#clearActivity')?.addEventListener(
 'click',
-() => toast(
-  'Actividad actualizada.'
-)
+() =>
+  toast(
+    'Actividad actualizada.'
+  )
 );
 
 
@@ -1183,16 +981,12 @@ e => {
       .toLowerCase()
       .trim();
 
-  $$('.course')
-    .forEach(c => {
-
-      c.style.display =
-        c.dataset.search.includes(q)
-          ? ''
-          : 'none';
-
-    });
-
+  $$('.course').forEach(c => {
+    c.style.display =
+      c.dataset.search.includes(q)
+        ? ''
+        : 'none';
+  });
 }
 );
 
@@ -1247,7 +1041,6 @@ showRegister?.addEventListener(
     .remove('hidden');
 
   $('#registerError').textContent = '';
-
 }
 );
 
@@ -1265,7 +1058,6 @@ showLogin?.addEventListener(
     .remove('hidden');
 
   $('#registerError').textContent = '';
-
 }
 );
 
@@ -1328,32 +1120,23 @@ async e => {
 
 
   if (password !== password2) {
-
     $('#registerError').textContent =
       'Las contraseñas no coinciden.';
-
     return;
-
   }
 
 
   if (password.length < 6) {
-
     $('#registerError').textContent =
       'La contraseña debe tener al menos 6 caracteres.';
-
     return;
-
   }
 
 
   if (!username) {
-
     $('#registerError').textContent =
       'El usuario es obligatorio.';
-
     return;
-
   }
 
 
@@ -1364,18 +1147,17 @@ async e => {
       {
         method: 'POST',
 
-        body:
-          JSON.stringify({
-            username,
-            password,
-            nombre,
-            apellido,
-            dni,
-            email,
-            telefono,
-            carrera,
-            direccion
-          })
+        body: JSON.stringify({
+          username,
+          password,
+          nombre,
+          apellido,
+          dni,
+          email,
+          telefono,
+          carrera,
+          direccion
+        })
       }
     );
 
@@ -1410,7 +1192,6 @@ async e => {
       error.message;
 
   }
-
 }
 );
 $$$
